@@ -1,0 +1,44 @@
+# 캠핑 빈자리 감시 설정
+# - 날짜는 "입실일" 기준. 지난 날짜는 자동으로 제외됨.
+# - 한 target 에 dates(특정일) 와 date_range(기간+요일) 를 함께 써도 됨.
+# - item_filter: 사이트/객실 이름 정규식. 비우면 전부 감시.  목록 확인: python -m watcher list <id>
+# - 네이버는 지도 링크(map.naver.com/p/entry/place/…)를 그대로 넣어도 예약 주소로 자동 변환됨.
+# - docs/index.html 을 브라우저로 열면 이 파일을 폼으로 편집할 수 있음.
+
+settings:
+  renotify_after_minutes: 180   # 계속 비어 있는 자리를 몇 분마다 다시 알릴지 (null 이면 최초 1회만)
+  notify_errors: true           # 사이트 조회 오류가 새로 생기면 알림
+
+targets:
+  - id: solip-weekend
+    name: 솔잎향캠핑파크 (시흥)
+    site: naver
+    url: https://m.booking.naver.com/booking/3/bizes/627922
+    item_filter: "^(?!.*커플석).*파쇄석"   # 파쇄석이면서 커플석이 아닌 자리
+    nights: 1                              # 토요일 입실 → 일요일 퇴실
+    date_range:
+      from: 2026-11-07
+      to: 2027-01-31
+      weekdays: [sat]
+
+  # 예시: 땡큐캠핑 (enabled: true 로 바꾸면 감시)
+  - id: thankq-jaraseom
+    enabled: false
+    site: thankq
+    url: https://m.thankqcamping.com/resv/view.hbb?cseq=1
+    nights: 1
+    date_range:
+      from: 2026-11-07
+      to: 2026-12-31
+      weekdays: [토]
+
+  # 예시: 전용 어댑터가 없는 사이트 (정규식 감시)
+  - id: generic-sample
+    enabled: false
+    site: generic
+    name: 어떤캠핑장
+    url: https://example.com/reserve?date={date}       # {date}=2026-11-07, {date8}=20261107
+    method: GET
+    available_regex: '예약가능|잔여\s*[1-9]\d*'
+    unavailable_regex: '예약마감|점검중'
+    dates: [2026-11-07]

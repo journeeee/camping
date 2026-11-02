@@ -1,0 +1,6 @@
+{
+  "2026-11-13": {"date": "2026-11-13", "isHoliday": false, "isBusinessDay": true, "isSaleDay": true, "stock": 3, "bookingCount": 1},
+  "2026-11-14": {"date": "2026-11-14", "isHoliday": false, "isBusinessDay": true, "isSaleDay": true, "stock": 3, "bookingCount": 3},
+  "2026-11-15": {"date": "2026-11-15", "isHoliday": false, "isBusinessDay": true, "isSaleDay": true, "stock": 3, "bookingCount": 0},
+  "2026-11-16": {"date": "2026-11-16", "isHoliday": false, "isBusinessDay": false, "isSaleDay": false, "stock": 0, "bookingCount": 0}
+}

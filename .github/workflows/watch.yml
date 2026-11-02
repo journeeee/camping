@@ -1,0 +1,47 @@
+name: camping-watch
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"     # GitHub Actions 최소 간격 5분 (부하 시 10~30분 지연될 수 있음)
+  workflow_dispatch:
+
+permissions:
+  contents: write             # state.json 커밋용
+
+concurrency:
+  group: camping-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run watcher
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python -m watcher run
+
+      - name: Persist state
+        run: |
+          git config user.name "camping-watch[bot]"
+          git config user.email "camping-watch@users.noreply.github.com"
+          git add state.json
+          if git diff --cached --quiet; then
+            echo "state unchanged"
+          else
+            git commit -m "chore: update watch state [skip ci]"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+            git push
+          fi

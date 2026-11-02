@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>캠핑 빈자리 감시 설정</title>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<style>
+  :root { --bg:#f6f7f4; --card:#fff; --line:#dfe3da; --ink:#1f2a1f; --muted:#6b756b; --accent:#2f7d4f; --accent2:#e8f3ec; --danger:#b23a3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:20px 16px 8px; max-width:960px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:14px; margin:0; }
+  main { max-width:960px; margin:0 auto; padding:8px 16px 60px; display:grid; gap:16px; grid-template-columns: 1fr; }
+  @media (min-width:860px){ main { grid-template-columns: 1fr 1fr; } .span2 { grid-column: 1 / -1; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card h2 { font-size:16px; margin:0 0 12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input[type=text], input[type=url], input[type=date], input[type=number], select, textarea {
+    width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:15px; background:#fff; color:var(--ink);
+  }
+  textarea { font-family: ui-monospace, Consolas, monospace; font-size:13px; min-height:260px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+  .chip { border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:14px; cursor:pointer; user-select:none; background:#fff; }
+  .chip.on { background:var(--accent2); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  button { padding:10px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:14px; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+  button.small { padding:6px 10px; font-size:13px; }
+  .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  .target { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+  .target.off { opacity:.55; }
+  .target .t { font-weight:600; }
+  .target .d { font-size:13px; color:var(--muted); margin-top:2px; word-break:break-all; }
+  .badge { display:inline-block; font-size:11px; padding:2px 7px; border-radius:999px; background:var(--accent2); color:var(--accent); margin-right:4px; }
+  .msg { font-size:13px; margin-top:8px; min-height:18px; }
+  .msg.err { color:var(--danger); }
+  .msg.ok { color:var(--accent); }
+  details summary { cursor:pointer; color:var(--muted); font-size:13px; }
+  .datelist { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .datelist .chip { background:var(--accent2); border-color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏕 캠핑 빈자리 감시 설정</h1>
+  <p class="sub">어디를, 언제, 어떤 자리로 보고 싶은지 입력하면 <code>watch.yaml</code> 을 만들어 줍니다. 입력 내용은 이 브라우저에만 저장됩니다.</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>감시 대상 추가</h2>
+    <label>예약 페이지 주소</label>
+    <input type="url" id="url" placeholder="네이버 지도 링크 또는 m.booking.naver.com / m.thankqcamping.com 주소" oninput="detectSite()">
+    <div class="hint" id="siteHint">네이버 지도에서 공유한 링크(map.naver.com/p/entry/place/…)를 그대로 붙여 넣어도 됩니다.</div>
+
+    <div class="row">
+      <div>
+        <label>사이트 종류</label>
+        <select id="site">
+          <option value="naver">네이버 예약</option>
+          <option value="thankq">땡큐캠핑</option>
+          <option value="generic">기타 (정규식)</option>
+        </select>
+      </div>
+      <div>
+        <label>표시 이름 (선택)</label>
+        <input type="text" id="name" placeholder="예: 솔잎향캠핑파크">
+      </div>
+    </div>
+
+    <label>자리 이름 필터 (선택, 정규식)</label>
+    <input type="text" id="filter" placeholder="예: 파쇄석   /   데크|글램핑   /   A동">
+    <div class="hint">비우면 모든 자리를 감시합니다. 자리 이름은 <code>python -m watcher list</code> 로 확인할 수 있습니다.</div>
+
+    <div class="row">
+      <div>
+        <label>박 수</label>
+        <input type="number" id="nights" min="1" max="7" value="1">
+      </div>
+      <div>
+        <label>요일 (기간 감시용)</label>
+        <div class="chips" id="weekdays">
+          <span class="chip" data-w="mon">월</span><span class="chip" data-w="tue">화</span><span class="chip" data-w="wed">수</span>
+          <span class="chip" data-w="thu">목</span><span class="chip on" data-w="fri">금</span><span class="chip on" data-w="sat">토</span><span class="chip" data-w="sun">일</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div><label>기간 시작</label><input type="date" id="from"></div>
+      <div><label>기간 끝</label><input type="date" id="to"></div>
+    </div>
+
+    <label>특정 날짜 추가 (선택)</label>
+    <div class="row">
+      <input type="date" id="oneDate">
+      <button type="button" onclick="addDate()">날짜 추가</button>
+    </div>
+    <div class="datelist" id="dates"></div>
+
+    <div id="genericBox" style="display:none">
+      <label>예약 가능 판정 정규식 (필수)</label>
+      <input type="text" id="availRe" placeholder="예약가능|잔여\s*[1-9]">
+      <label>예약 불가 판정 정규식 (선택)</label>
+      <input type="text" id="unavailRe" placeholder="예약마감">
+      <div class="hint">주소에 <code>{date}</code>(2026-11-07) 또는 <code>{date8}</code>(20261107) 를 넣으면 날짜마다 치환됩니다.</div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" type="button" onclick="addTarget()">목록에 추가</button>
+      <button type="button" onclick="resetForm()">입력 초기화</button>
+    </div>
+    <div class="msg" id="formMsg"></div>
+  </section>
+
+  <section class="card">
+    <h2>감시 목록</h2>
+    <div id="list"></div>
+    <div class="hint" id="emptyHint">아직 없습니다. 왼쪽에서 추가하세요.</div>
+
+    <h2 style="margin-top:18px">알림 설정</h2>
+    <div class="row">
+      <div>
+        <label>계속 비어 있는 자리 재알림 (분)</label>
+        <input type="number" id="renotify" min="0" value="180" placeholder="비우면 최초 1회만">
+      </div>
+      <div>
+        <label>조회 오류 알림</label>
+        <select id="notifyErrors"><option value="true">켬</option><option value="false">끔</option></select>
+      </div>
+    </div>
+  </section>
+
+  <section class="card span2">
+    <h2>watch.yaml</h2>
+    <textarea id="yaml" readonly></textarea>
+    <div class="actions">
+      <button type="button" onclick="copyYaml()">복사</button>
+      <button type="button" onclick="downloadYaml()">watch.yaml 내려받기</button>
+      <button type="button" onclick="importYaml()">YAML 붙여넣어 불러오기</button>
+    </div>
+    <div class="msg" id="yamlMsg"></div>
+
+    <details style="margin-top:14px">
+      <summary>GitHub 저장소에 바로 저장하기 (선택)</summary>
+      <div class="hint" style="margin:8px 0">GitHub → Settings → Developer settings → Fine-grained tokens 에서 이 저장소의 <b>Contents: Read and write</b> 권한만 가진 토큰을 만들어 넣으세요. 토큰은 이 브라우저에만 저장됩니다. 저장하면 다음 5분 주기 실행부터 반영됩니다.</div>
+      <div class="row">
+        <div><label>저장소 (owner/repo)</label><input type="text" id="ghRepo" placeholder="myname/camping"></div>
+        <div><label>브랜치</label><input type="text" id="ghBranch" value="main"></div>
+      </div>
+      <label>토큰</label>
+      <input type="text" id="ghToken" placeholder="github_pat_…" autocomplete="off">
+      <div class="actions">
+        <button type="button" onclick="ghLoad()">저장소에서 불러오기</button>
+        <button class="primary" type="button" onclick="ghSave()">저장소에 저장 (커밋)</button>
+      </div>
+      <div class="msg" id="ghMsg"></div>
+    </details>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const WD_KO = {mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
+let state = load();
+
+function load(){
+  try { return JSON.parse(localStorage.getItem('campwatch') || '') } catch(e){}
+  return { targets: [], settings: { renotify_after_minutes: 180, notify_errors: true } };
+}
+function persist(){ localStorage.setItem('campwatch', JSON.stringify(state)); }
+
+// ---------- 폼 ----------
+let pickedDates = [];
+document.querySelectorAll('#weekdays .chip').forEach(c => c.onclick = () => c.classList.toggle('on'));
+$('site').onchange = () => { $('genericBox').style.display = $('site').value === 'generic' ? '' : 'none'; };
+(function initDates(){
+  const t = new Date(); const f = t.toISOString().slice(0,10);
+  const e = new Date(t.getTime() + 60*86400000).toISOString().slice(0,10);
+  $('from').value = f; $('to').value = e;
+})();
+
+function detectSite(){
+  const u = $('url').value.trim();
+  let s = null, hint = '';
+  if (/booking\.naver\.com|map\.naver\.com|place\.naver\.com|naver\.me/.test(u)) { s='naver'; hint='네이버 예약으로 인식했습니다. 지도 링크는 실행 시 예약 주소로 자동 변환됩니다.'; }
+  else if (/thankqcamping\.com/.test(u)) { s='thankq'; hint = /cseq=/.test(u) ? '땡큐캠핑으로 인식했습니다.' : '땡큐캠핑 주소에는 cseq= 번호가 있어야 합니다. 캠핑장 상세 페이지 주소를 넣어 주세요.'; }
+  else if (u) { s='generic'; hint='전용 어댑터가 없는 사이트입니다. 아래에 예약 가능 판정 정규식을 적어 주세요.'; }
+  if (s) { $('site').value = s; $('site').onchange(); }
+  $('siteHint').textContent = hint || '네이버 지도에서 공유한 링크를 그대로 붙여 넣어도 됩니다.';
+}
+function addDate(){
+  const d = $('oneDate').value; if (!d) return;
+  if (!pickedDates.includes(d)) pickedDates.push(d);
+  pickedDates.sort(); renderDates();
+}
+function renderDates(){
+  $('dates').innerHTML = pickedDates.map(d => `<span class="chip" onclick="removeDate('${d}')">${d} ✕</span>`).join('');
+}
+function removeDate(d){ pickedDates = pickedDates.filter(x => x !== d); renderDates(); }
+function msg(id, text, cls){ const el=$(id); el.textContent=text; el.className='msg '+(cls||''); }
+
+function slugify(s){ return (s||'').toLowerCase().replace(/[^a-z0-9가-힣]+/g,'-').replace(/^-|-$/g,'') || 'target'; }
+
+function addTarget(){
+  const url = $('url').value.trim();
+  if (!url) return msg('formMsg','예약 페이지 주소를 넣어 주세요.','err');
+  const site = $('site').value;
+  const wds = [...document.querySelectorAll('#weekdays .chip.on')].map(c => c.dataset.w);
+  const from = $('from').value, to = $('to').value;
+  if (!pickedDates.length && !(from && to)) return msg('formMsg','기간이나 특정 날짜 중 하나는 있어야 합니다.','err');
+  if (from && to && from > to) return msg('formMsg','기간 끝이 시작보다 빠릅니다.','err');
+  if (site === 'generic' && !$('availRe').value.trim()) return msg('formMsg','기타 사이트는 예약 가능 판정 정규식이 필요합니다.','err');
+
+  const name = $('name').value.trim();
+  const t = { id: uniqueId(slugify(name || site)), site, url };
+  if (name) t.name = name;
+  if ($('filter').value.trim()) t.item_filter = $('filter').value.trim();
+  t.nights = Math.max(1, parseInt($('nights').value || '1', 10));
+  if (pickedDates.length) t.dates = [...pickedDates];
+  if (from && to && wds.length) t.date_range = { from, to, weekdays: wds };
+  if (site === 'generic') {
+    t.available_regex = $('availRe').value.trim();
+    if ($('unavailRe').value.trim()) t.unavailable_regex = $('unavailRe').value.trim();
+  }
+  state.targets.push(t); persist(); render();
+  msg('formMsg', `"${t.id}" 를 추가했습니다.`, 'ok');
+}
+function uniqueId(base){ let id = base, n = 2; const ids = new Set(state.targets.map(t=>t.id)); while (ids.has(id)) id = `${base}-${n++}`; return id; }
+function resetForm(){ ['url','name','filter','availRe','unavailRe'].forEach(i=>$(i).value=''); $('nights').value=1; pickedDates=[]; renderDates(); msg('formMsg',''); }
+
+// ---------- 목록 ----------
+function describe(t){
+  const parts = [];
+  if (t.item_filter) parts.push(`자리: ${t.item_filter}`);
+  parts.push(`${t.nights||1}박`);
+  if (t.date_range) parts.push(`${t.date_range.from}~${t.date_range.to} ${(t.date_range.weekdays||[]).map(w=>WD_KO[w]||w).join('')}`);
+  if (t.dates && t.dates.length) parts.push(`날짜 ${t.dates.length}개`);
+  return parts.join(' · ');
+}
+function render(){
+  const L = $('list'); L.innerHTML = '';
+  $('emptyHint').style.display = state.targets.length ? 'none' : '';
+  state.targets.forEach((t, i) => {
+    const off = t.enabled === false;
+    const el = document.createElement('div'); el.className = 'target' + (off ? ' off' : '');
+    el.innerHTML = `<div><div class="t"><span class="badge">${t.site}</span>${t.name || t.id}</div>
+      <div class="d">${describe(t)}</div><div class="d">${t.url}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <button class="small" onclick="toggle(${i})">${off ? '켜기' : '끄기'}</button>
+        <button class="small" onclick="remove(${i})">삭제</button></div>`;
+    L.appendChild(el);
+  });
+  $('renotify').value = state.settings.renotify_after_minutes ?? '';
+  $('notifyErrors').value = String(state.settings.notify_errors !== false);
+  $('yaml').value = toYaml();
+}
+function toggle(i){ const t = state.targets[i]; if (t.enabled === false) delete t.enabled; else t.enabled = false; persist(); render(); }
+function remove(i){ if (!confirm('삭제할까요?')) return; state.targets.splice(i,1); persist(); render(); }
+$('renotify').onchange = () => { const v = $('renotify').value; state.settings.renotify_after_minutes = v === '' ? null : parseInt(v,10); persist(); render(); };
+$('notifyErrors').onchange = () => { state.settings.notify_errors = $('notifyErrors').value === 'true'; persist(); render(); };
+
+// ---------- YAML ----------
+function toYaml(){
+  const doc = { settings: { renotify_after_minutes: state.settings.renotify_after_minutes ?? null, notify_errors: state.settings.notify_errors !== false },
+                targets: state.targets };
+  return '# 캠핑 빈자리 감시 설정 (docs/index.html 에서 생성)\n' + jsyaml.dump(doc, { lineWidth: -1, noRefs: true, quotingType: '"' });
+}
+function copyYaml(){ navigator.clipboard.writeText($('yaml').value).then(()=>msg('yamlMsg','복사했습니다. 저장소의 watch.yaml 에 붙여 넣고 커밋하세요.','ok')); }
+function downloadYaml(){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('yaml').value], {type:'text/yaml'})); a.download = 'watch.yaml'; a.click();
+}
+function importYaml(){
+  const txt = prompt('watch.yaml 내용을 붙여 넣으세요'); if (!txt) return;
+  try { applyYaml(txt); msg('yamlMsg','불러왔습니다.','ok'); } catch(e){ msg('yamlMsg','YAML 해석 실패: '+e.message,'err'); }
+}
+function applyYaml(txt){
+  const doc = jsyaml.load(txt) || {};
+  const norm = v => (v instanceof Date) ? v.toISOString().slice(0,10) : v;
+  state.targets = (doc.targets || []).map(t => {
+    if (t.dates) t.dates = t.dates.map(norm);
+    if (t.date_range) { t.date_range.from = norm(t.date_range.from); t.date_range.to = norm(t.date_range.to); }
+    return t;
+  });
+  state.settings = Object.assign({ renotify_after_minutes: 180, notify_errors: true }, doc.settings || {});
+  persist(); render();
+}
+
+// ---------- GitHub ----------
+['ghRepo','ghBranch','ghToken'].forEach(id => { $(id).value = localStorage.getItem('campwatch.'+id) || $(id).value; $(id).onchange = () => localStorage.setItem('campwatch.'+id, $(id).value.trim()); });
+function ghHeaders(){ return { 'Authorization': 'Bearer ' + $('ghToken').value.trim(), 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }; }
+function ghUrl(){ return `https://api.github.com/repos/${$('ghRepo').value.trim()}/contents/watch.yaml?ref=${encodeURIComponent($('ghBranch').value.trim()||'main')}`; }
+function b64(str){ return btoa(unescape(encodeURIComponent(str))); }
+function unb64(b){ return decodeURIComponent(escape(atob(b.replace(/\n/g,'')))); }
+async function ghLoad(){
+  if (!$('ghRepo').value || !$('ghToken').value) return msg('ghMsg','저장소와 토큰을 입력하세요.','err');
+  msg('ghMsg','불러오는 중…');
+  const r = await fetch(ghUrl(), { headers: ghHeaders() });
+  if (!r.ok) return msg('ghMsg', `불러오기 실패 (${r.status}). 저장소 이름·브랜치·토큰 권한을 확인하세요.`, 'err');
+  const j = await r.json();
+  try { applyYaml(unb64(j.content)); msg('ghMsg','저장소의 watch.yaml 을 불러왔습니다.','ok'); } catch(e){ msg('ghMsg','YAML 해석 실패: '+e.message,'err'); }
+}
+async function ghSave(){
+  if (!$('ghRepo').value || !$('ghToken').value) return msg('ghMsg','저장소와 토큰을 입력하세요.','err');
+  msg('ghMsg','저장 중…');
+  let sha;
+  const r0 = await fetch(ghUrl(), { headers: ghHeaders() });
+  if (r0.ok) sha = (await r0.json()).sha;
+  const body = { message: 'watch.yaml 업데이트 (설정 페이지)', content: b64($('yaml').value), branch: $('ghBranch').value.trim() || 'main' };
+  if (sha) body.sha = sha;
+  const r = await fetch(ghUrl().split('?')[0], { method:'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); return msg('ghMsg', `저장 실패 (${r.status}): ${e.message||''}`, 'err'); }
+  msg('ghMsg','커밋했습니다. 다음 실행부터 새 설정으로 감시합니다.','ok');
+}
+
+render();
+</script>
+</body>
+</html>
