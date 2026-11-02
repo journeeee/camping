@@ -21,6 +21,17 @@ targets:
       to: 2027-01-31
       weekdays: [sat]
 
+  - id: noeuljin-weekend
+    name: 노을진캠핑장 (인천)
+    site: thankq
+    url: https://m.thankqcamping.com/resv/view.hbb?cseq=16706
+    item_filter: 파쇄석
+    nights: 1                              # 토요일 입실 → 일요일 퇴실
+    date_range:
+      from: 2026-11-07
+      to: 2027-01-31
+      weekdays: [sat]
+
   # 예시: 땡큐캠핑 (enabled: true 로 바꾸면 감시)
   - id: thankq-jaraseom
     enabled: false
