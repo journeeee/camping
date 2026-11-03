@@ -2,6 +2,7 @@
 
   python -m watcher run                 # 감시 1회 실행 (크론에서 호출)
   python -m watcher run --dry-run       # 알림 보내지 않고 결과만 출력
+  python -m watcher run --loop 120      # 2분 간격으로 계속 조회 (기본 최대 330분)
   python -m watcher list <target-id>    # 해당 target 의 사이트/객실 목록 출력 (item_filter 작성용)
   python -m watcher test-notify         # 알림 채널 설정 확인용 테스트 메시지
   python -m watcher setup-telegram 봇토큰   # chat id 자동 탐지 → .env 저장 → 테스트 메시지
@@ -9,8 +10,11 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import os
 import sys
+
+print = functools.partial(print, flush=True)  # noqa: A001  CI 로그 실시간 출력
 import traceback
 
 from .adapters import get_adapter
@@ -22,6 +26,26 @@ from .state import State
 
 
 def cmd_run(args) -> int:
+    if not args.loop:
+        return run_once(args)
+    import time
+    from datetime import datetime
+    deadline = time.monotonic() + args.max_minutes * 60
+    n = 0
+    while True:
+        n += 1
+        print(f"\n===== {datetime.now().strftime('%H:%M:%S')} 조회 #{n} (간격 {args.loop}s, 최대 {args.max_minutes}분)", flush=True)
+        try:
+            run_once(args)
+        except Exception as e:  # 설정 오류 등 치명적 문제만 여기로 옴
+            print(f"실행 오류: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        if time.monotonic() + args.loop > deadline:
+            print("최대 실행 시간 도달, 종료", flush=True)
+            return 0
+        time.sleep(args.loop)
+
+
+def run_once(args) -> int:
     settings, targets = load_targets(args.config)
     state = State(args.state)
     notifier = Notifier()
@@ -141,6 +165,8 @@ def main(argv=None) -> int:
     p.add_argument("--state", default="state.json")
     sub = p.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run"); r.add_argument("--dry-run", action="store_true"); r.add_argument("-v", "--verbose", action="store_true")
+    r.add_argument("--loop", type=int, metavar="초", help="이 간격(초)으로 반복 조회 (미지정 시 1회)")
+    r.add_argument("--max-minutes", type=int, default=330, help="--loop 사용 시 최대 실행 시간(분), 기본 330")
     r.set_defaults(fn=cmd_run)
     l = sub.add_parser("list"); l.add_argument("target_id", nargs="?"); l.set_defaults(fn=cmd_list)
     sub.add_parser("test-notify").set_defaults(fn=cmd_test_notify)
