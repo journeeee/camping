@@ -55,8 +55,8 @@ powershell -ExecutionPolicy Bypass -File scripts\watch_loop.ps1 -IntervalSec 120
 
 알아 둘 점
 - GitHub 무료 스케줄러는 `*/5` 같은 짧은 주기 크론을 자주 건너뜁니다 (실측: 하루 몇 번만 실행).
-  그래서 워크플로는 한 번 시작되면 작업 안에서 5분마다 조회하며 약 5시간 반 동안 돌고,
-  끝나면 다음 스케줄 실행이 이어받도록 되어 있습니다 (`python -m watcher run --loop 300`).
+  그래서 워크플로는 한 번 시작되면 작업 안에서 10분마다 조회하며 약 5시간 반 동안 돌고,
+  끝나면 다음 스케줄 실행이 이어받도록 되어 있습니다 (`python -m watcher run --loop 600`).
 - **저장소를 Public 으로 두세요.** Public 저장소는 Actions 사용 시간이 무제한 무료지만, Private 은 월 2,000분이라
   이 방식(하루 약 1,440분)으로는 이틀 만에 소진되어 감시가 멈춥니다. 코드에는 비밀값이 없고
   Secrets 는 공개되지 않으므로 Public 이어도 안전합니다.
