@@ -14,7 +14,7 @@ targets:
     name: 솔잎향캠핑파크 (시흥)
     site: naver
     url: https://m.booking.naver.com/booking/3/bizes/627922
-    item_filter: "^(?!.*커플석).*파쇄석"   # 파쇄석이면서 커플석이 아닌 자리
+    item_filter: 데크
     nights: 1                              # 토요일 입실 → 일요일 퇴실
     date_range:
       from: 2026-11-07
@@ -25,7 +25,18 @@ targets:
     name: 노을진캠핑장 (인천)
     site: thankq
     url: https://m.thankqcamping.com/resv/view.hbb?cseq=16706
-    item_filter: 파쇄석
+    item_filter: 데크
+    nights: 1                              # 토요일 입실 → 일요일 퇴실
+    date_range:
+      from: 2026-11-07
+      to: 2027-01-31
+      weekdays: [sat]
+
+  - id: cheongna-weekend
+    name: 청라해변공원캠핑장 (인천)
+    site: thankq                           # 숙박 데크존은 네이버에 없고 땡큐캠핑에서 예약
+    url: https://m.thankqcamping.com/resv/view.hbb?cseq=4240
+    item_filter: 데크
     nights: 1                              # 토요일 입실 → 일요일 퇴실
     date_range:
       from: 2026-11-07
